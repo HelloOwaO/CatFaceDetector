@@ -35,7 +35,7 @@ import dlib
 # faces dataset in the examples/faces directory.  This means you need to supply
 # the path to this faces folder as a command line argument so we will know
 # where it is.
-if len(sys.argv) != 2:
+if len(sys.argv) != 3:
     print(
         "Give the path to the examples/faces directory as the argument to this "
         "program. For example, if you are in the python_examples folder then "
@@ -43,6 +43,7 @@ if len(sys.argv) != 2:
         "    ./train_object_detector.py ../examples/faces")
     exit()
 faces_folder = sys.argv[1]
+test_folder = sys.argv[2]
 
 
 # Now let's do the training.  The train_simple_object_detector() function has a
@@ -52,21 +53,20 @@ options = dlib.simple_object_detector_training_options()
 # Since faces are left/right symmetric we can tell the trainer to train a
 # symmetric detector.  This helps it get the most value out of the training
 # data.
-options.add_left_right_image_flips = True
+options.add_left_right_image_flips = False
 # The trainer is a kind of support vector machine and therefore has the usual
 # SVM C parameter.  In general, a bigger C encourages it to fit the training
 # data better but might lead to overfitting.  You must find the best C value
 # empirically by checking how well the trained detector works on a test set of
 # images you haven't trained on.  Don't just leave the value set at 5.  Try a
 # few different C values and see what works best for your data.
-options.C = 5
+options.C = 3500
 # Tell the code how many CPU cores your computer has for the fastest training.
-options.num_threads = 4
+options.num_threads = 6
 options.be_verbose = True
 
 
-training_xml_path = os.path.join(faces_folder, "training.xml")
-testing_xml_path = os.path.join(faces_folder, "testing.xml")
+training_xml_path = os.path.join(faces_folder, "dataset.xml")
 # This function does the actual training.  It will save the final detector to
 # detector.svm.  The input is an XML file that lists the images in the training
 # dataset and also contains the positions of the face boxes.  To create your
@@ -75,7 +75,7 @@ testing_xml_path = os.path.join(faces_folder, "testing.xml")
 # images with boxes.  To see how to use it read the tools/imglab/README.txt
 # file.  But for this example, we just use the training.xml file included with
 # dlib.
-dlib.train_simple_object_detector(training_xml_path, "detector.svm", options)
+dlib.train_simple_object_detector(training_xml_path, os.path.join(faces_folder, "detector.svm"), options)
 
 
 
@@ -84,12 +84,10 @@ dlib.train_simple_object_detector(training_xml_path, "detector.svm", options)
 # average precision.
 print("")  # Print blank line to create gap from previous output
 print("Training accuracy: {}".format(
-    dlib.test_simple_object_detector(training_xml_path, "detector.svm")))
+    dlib.test_simple_object_detector(training_xml_path, os.path.join(faces_folder, "detector.svm"))))
 # However, to get an idea if it really worked without overfitting we need to
 # run it on images it wasn't trained on.  The next line does this.  Happily, we
 # see that the object detector works perfectly on the testing images.
-print("Testing accuracy: {}".format(
-    dlib.test_simple_object_detector(testing_xml_path, "detector.svm")))
 
 
 
@@ -97,7 +95,7 @@ print("Testing accuracy: {}".format(
 
 # Now let's use the detector as you would in a normal application.  First we
 # will load it from disk.
-detector = dlib.simple_object_detector("detector.svm")
+detector = dlib.simple_object_detector(os.path.join(faces_folder, "detector.svm"))
 
 # We can look at the HOG filter we learned.  It should look like a face.  Neat!
 win_det = dlib.image_window()
@@ -107,7 +105,7 @@ win_det.set_image(detector)
 # results.
 print("Showing detections on the images in the faces folder...")
 win = dlib.image_window()
-for f in glob.glob(os.path.join(faces_folder, "*.jpg")):
+for f in glob.glob(os.path.join(test_folder, "*.png")):
     print("Processing file: {}".format(f))
     img = dlib.load_rgb_image(f)
     dets = detector(img)
@@ -120,6 +118,8 @@ for f in glob.glob(os.path.join(faces_folder, "*.jpg")):
     win.set_image(img)
     win.add_overlay(dets)
     dlib.hit_enter_to_continue()
+
+sys.exit(0)
 
 # Next, suppose you have trained multiple detectors and you want to run them
 # efficiently as a group.  You can do this as follows:
