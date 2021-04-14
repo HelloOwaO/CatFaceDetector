@@ -43,7 +43,7 @@ import dlib
 # faces dataset in the examples/faces directory.  This means you need to supply
 # the path to this faces folder as a command line argument so we will know
 # where it is.
-if len(sys.argv) != 2:
+if len(sys.argv) != 3:
     print(
         "Give the path to the examples/faces directory as the argument to this "
         "program. For example, if you are in the python_examples folder then "
@@ -51,6 +51,7 @@ if len(sys.argv) != 2:
         "    ./train_shape_predictor.py ../examples/faces")
     exit()
 faces_folder = sys.argv[1]
+test_folder = sys.argv[2]
 
 options = dlib.shape_predictor_training_options()
 # Now make the object responsible for training the model.
@@ -62,21 +63,33 @@ options = dlib.shape_predictor_training_options()
 # have a very small dataset.  In particular, setting the oversampling
 # to a high amount (300) effectively boosts the training set size, so
 # that helps this example.
-options.oversampling_amount = 300
+# options.oversampling_amount = 300
 # I'm also reducing the capacity of the model by explicitly increasing
 # the regularization (making nu smaller) and by using trees with
 # smaller depths.
-options.nu = 0.05
-options.tree_depth = 2
+options.nu = 0.1
+options.tree_depth = 4
+
+#---------------
+options.cascade_depth = 15
+options.feature_pool_size = 400
+options.oversampling_translation_jitter = 0.1
+options.oversampling_amount = 5
+options.num_test_splits = 50
+options.num_threads = 8
+
+#---------------
+
 options.be_verbose = True
 
 # dlib.train_shape_predictor() does the actual training.  It will save the
 # final predictor to predictor.dat.  The input is an XML file that lists the
 # images in the training dataset and also contains the positions of the face
 # parts.
-training_xml_path = os.path.join(faces_folder, "training_with_face_landmarks.xml")
-dlib.train_shape_predictor(training_xml_path, "predictor.dat", options)
+training_xml_path = os.path.join(faces_folder, "dataset.xml")
+dlib.train_shape_predictor(training_xml_path, os.path.join(faces_folder, "predictor.dat"), options)
 
+'''
 # Now that we have a model we can test it.  dlib.test_shape_predictor()
 # measures the average distance between a face landmark output by the
 # shape_predictor and where it should be according to the truth data.
@@ -90,18 +103,24 @@ print("\nTraining accuracy: {}".format(
 testing_xml_path = os.path.join(faces_folder, "testing_with_face_landmarks.xml")
 print("Testing accuracy: {}".format(
     dlib.test_shape_predictor(testing_xml_path, "predictor.dat")))
+'''
 
 # Now let's use it as you would in a normal application.  First we will load it
 # from disk. We also need to load a face detector to provide the initial
 # estimate of the facial location.
-predictor = dlib.shape_predictor("predictor.dat")
-detector = dlib.get_frontal_face_detector()
+predictor = dlib.shape_predictor(os.path.join(faces_folder, "predictor.dat"))
+#detector = dlib.get_frontal_face_detector()
+detector = dlib.simple_object_detector(os.path.join(faces_folder, "detector.svm"))
 
 # Now let's run the detector and shape_predictor over the images in the faces
 # folder and display the results.
 print("Showing detections and predictions on the images in the faces folder...")
 win = dlib.image_window()
-for f in glob.glob(os.path.join(faces_folder, "*.jpg")):
+
+file_list = glob.glob(os.path.join(test_folder, "*.jpg"))
+file_list += glob.glob(os.path.join(test_folder, "*.jpg"))
+
+for f in file_list:
     print("Processing file: {}".format(f))
     img = dlib.load_rgb_image(f)
 
@@ -118,8 +137,6 @@ for f in glob.glob(os.path.join(faces_folder, "*.jpg")):
             k, d.left(), d.top(), d.right(), d.bottom()))
         # Get the landmarks/parts for the face in box d.
         shape = predictor(img, d)
-        print("Part 0: {}, Part 1: {} ...".format(shape.part(0),
-                                                  shape.part(1)))
         # Draw the face landmarks on the screen.
         win.add_overlay(shape)
 
